@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Address Egypt - نظام إدارة وتحليل العملاء المحتملين (CRM)</title>
+  <meta name="description" content="نظام إدارة ومتابعة العملاء المحتملين لشركة Smart Address Egypt - تحليل باقات المقرات الافتراضية وغرف الاجتماعات">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/jpeg" href="logo.jpg">
+  <!-- Vendor libraries: SheetJS & ChartJS -->
+  <script src="xlsx.full.min.js"></script>
+  <script src="chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Persistent Sidebar -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <img src="logo.jpg" alt="Smart Address Egypt Logo" class="brand-logo-img">
+        <div class="brand-info">
+          <h1>Smart Address</h1>
+          <p>إدارة المبيعات والمقرات الافتراضية</p>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">لوحة التحكم والمبيعات</div>
+        <a class="nav-item active" data-page="dashboard" id="nav-dashboard">
+          <span class="nav-icon">📊</span>
+          <span>نظرة عامة</span>
+        </a>
+        <a class="nav-item" data-page="all-leads" id="nav-all-leads">
+          <span class="nav-icon">👥</span>
+          <span>كل العملاء المحتملين</span>
+          <span class="nav-badge primary" id="badgeTotalLeads">0</span>
+        </a>
+        <a class="nav-item" data-page="today-followups" id="nav-today-followups">
+          <span class="nav-icon">📞</span>
+          <span>متابعات اليوم</span>
+          <span class="nav-badge danger" id="badgeTodayFollowups">0</span>
+        </a>
+        <a class="nav-item" data-page="hot-leads" id="nav-hot-leads">
+          <span class="nav-icon">🔥</span>
+          <span>العملاء الأكثر أولوية</span>
+          <span class="nav-badge warning" id="badgeHotLeads">0</span>
+        </a>
+        <a class="nav-item" data-page="future-opps" id="nav-future-opps">
+          <span class="nav-icon">⏳</span>
+          <span>فرص مستقبلية (&gt; 3 شهور)</span>
+        </a>
+        <a class="nav-item" data-page="pipeline" id="nav-pipeline">
+          <span class="nav-icon">📋</span>
+          <span>مراحل البيع (Pipeline)</span>
+        </a>
+
+        <div class="nav-section-title">البيانات والحملات</div>
+        <a class="nav-item" data-page="campaigns" id="nav-campaigns">
+          <span class="nav-icon">📈</span>
+          <span>تحليل الحملات</span>
+        </a>
+        <a class="nav-item" data-page="import-center" id="nav-import-center">
+          <span class="nav-icon">📥</span>
+          <span>استيراد Excel و CSV</span>
+        </a>
+        <a class="nav-item" data-page="archive" id="nav-archive">
+          <span class="nav-icon">🗄️</span>
+          <span>الأرشيف والمستبعدين</span>
+        </a>
+        <a class="nav-item" data-page="settings" id="nav-settings">
+          <span class="nav-icon">⚙️</span>
+          <span>الإعدادات والذكاء الاصطناعي</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="serverStatusContainer" style="display: flex; align-items: center; gap: 6px;">
+          <span class="status-dot" id="serverStatusDot"></span>
+          <span id="serverStatusText">النظام متصل (قاعدة بيانات حية)</span>
+        </div>
+        <span style="font-weight: 700; color: var(--gold);">v2.4 Pro</span>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <main class="main-wrapper">
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-right">
+          <button class="btn btn-outline btn-icon" id="btnToggleMobileSidebar" style="display: none;">☰</button>
+          <div class="page-title-box">
+            <h2 id="currentPageTitle">نظرة عامة والتحليلات</h2>
+            <p id="currentPageSubtitle">مؤشرات الأداء اللحظية لعملاء Smart Address Egypt</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="search-input-wrapper">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="globalSearchInput" placeholder="بحث باسم العميل، الهاتف، الوظيفة أو الحملة...">
+          </div>
+          <button class="btn btn-primary btn-sm" id="btnQuickImport">
+            <span>📥</span>
+            <span>استيراد ملف جديد</span>
+          </button>
+          <button class="btn btn-outline btn-sm" id="btnRefreshData" title="تحديث البيانات">
+            <span>🔄</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Connection Error Banner -->
+      <div id="connectionErrorBanner" class="connection-banner" style="display: none; background: rgba(239, 68, 68, 0.15); border-bottom: 1px solid rgba(239, 68, 68, 0.4); padding: 12px 28px; color: #fca5a5; font-size: 0.88rem; align-items: center; justify-content: space-between; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span style="font-size: 1.2rem;">⚠️</span>
+          <span><strong>تعذر الاتصال بالخادم:</strong> يرجى تشغيل الخادم المحلي عبر ملف <code>start_crm.bat</code> على المنفذ 3456 للتأكد من حفظ وتحديث البيانات.</span>
+        </div>
+        <button class="btn btn-outline btn-sm" id="btnRetryConnection" style="border-color: rgba(239, 68, 68, 0.5); color: #ffffff;">
+          <span>🔄</span>
+          <span>إعادة المحاولة الآن</span>
+        </button>
+      </div>
+
+      <!-- Main Body Container -->
+      <div class="content-body" id="mainContent">
+
+        <!-- PAGE 1: DASHBOARD (نظرة عامة) -->
+        <section class="page-view active" id="page-dashboard">
+          <!-- KPI Cards Grid -->
+          <div class="kpi-grid">
+            <div class="kpi-card" data-filter-status="" id="kpiTotal">
+              <div class="kpi-header">
+                <span class="kpi-label">إجمالي العملاء</span>
+                <span class="kpi-icon-badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">👥</span>
+              </div>
+              <div class="kpi-value" id="kpiValTotal">0</div>
+              <div class="kpi-sub">قاعدة البيانات النشطة</div>
+            </div>
+
+            <div class="kpi-card kpi-hot" data-filter-priority="hot" id="kpiHot">
+              <div class="kpi-header">
+                <span class="kpi-label">عملاء ساخنون (Hot)</span>
+                <span class="kpi-icon-badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">🔥</span>
+              </div>
+              <div class="kpi-value" id="kpiValHot">0</div>
+              <div class="kpi-sub">أعلى نية شراء (80-100)</div>
+            </div>
+
+            <div class="kpi-card" data-filter-priority="warm" id="kpiWarm">
+              <div class="kpi-header">
+                <span class="kpi-label">عملاء دافئون (Warm)</span>
+                <span class="kpi-icon-badge" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa;">⚡</span>
+              </div>
+              <div class="kpi-value" id="kpiValWarm">0</div>
+              <div class="kpi-sub">أولوية متابعة عالية (60-79)</div>
+            </div>
+
+            <div class="kpi-card kpi-today" data-filter-status="contact_today" id="kpiContactToday">
+              <div class="kpi-header">
+                <span class="kpi-label">اتصال ومتابعة اليوم</span>
+                <span class="kpi-icon-badge" style="background: rgba(37, 99, 235, 0.2); color: #93c5fd;">📞</span>
+              </div>
+              <div class="kpi-value" id="kpiValContactToday">0</div>
+              <div class="kpi-sub">مستحقة التواصل الفوري</div>
+            </div>
+
+            <div class="kpi-card kpi-overdue" data-workspace="overdue" id="kpiOverdue">
+              <div class="kpi-header">
+                <span class="kpi-label">متابعات متأخرة</span>
+                <span class="kpi-icon-badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">⚠️</span>
+              </div>
+              <div class="kpi-value" id="kpiValOverdue">0</div>
+              <div class="kpi-sub">تجاوزت الموعد المحدد</div>
+            </div>
+
+            <div class="kpi-card kpi-negotiation" data-filter-status="in_negotiation" id="kpiNegotiation">
+              <div class="kpi-header">
+                <span class="kpi-label">مرحلة التفاوض</span>
+                <span class="kpi-icon-badge" style="background: rgba(139, 92, 246, 0.2); color: #c084fc;">💬</span>
+              </div>
+              <div class="kpi-value" id="kpiValNegotiation">0</div>
+              <div class="kpi-sub">تم إرسال العرض والتسعير</div>
+            </div>
+
+            <div class="kpi-card kpi-won" data-filter-status="won" id="kpiWon">
+              <div class="kpi-header">
+                <span class="kpi-label">صفقات رابحة (Won)</span>
+                <span class="kpi-icon-badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">🏆</span>
+              </div>
+              <div class="kpi-value" id="kpiValWon">0</div>
+              <div class="kpi-sub">تم التعاقد وسداد الباقة</div>
+            </div>
+
+            <div class="kpi-card" id="kpiConvRate">
+              <div class="kpi-header">
+                <span class="kpi-label">نسبة التحويل (CR)</span>
+                <span class="kpi-icon-badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">📈</span>
+              </div>
+              <div class="kpi-value" id="kpiValConvRate">0%</div>
+              <div class="kpi-sub">من إجمالي العملاء الفعليين</div>
+            </div>
+          </div>
+
+          <!-- Charts Section -->
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">توزيع العملاء حسب مرحلة البيع (CRM Status)</div>
+              </div>
+              <div class="chart-container">
+                <canvas id="chartStatus"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">تصنيف درجات الجودة والأولوية (Scoring Bands)</div>
+              </div>
+              <div class="chart-container">
+                <canvas id="chartQuality"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">أداء الحملات الإعلانية ومعدل التحويل (Top Campaigns)</div>
+              </div>
+              <div class="chart-container">
+                <canvas id="chartCampaigns"></canvas>
+              </div>
+            </div>
+
+            <div class="chart-card">
+              <div class="chart-header">
+                <div class="chart-title">أسباب عدم الاهتمام وخسارة الصفقات (Lost Reasons)</div>
+              </div>
+              <div class="chart-container">
+                <canvas id="chartLostReasons"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 2: ALL LEADS (كل العملاء المحتملين) -->
+        <section class="page-view" id="page-all-leads" style="display: none;">
+          <div class="card-table-wrapper">
+            <!-- Filter Toolbar -->
+            <div class="table-toolbar">
+              <div class="filter-group">
+                <select class="filter-select" id="filterStatus">
+                  <option value="">جميع الحالات (CRM Status)</option>
+                  <option value="contact_today">اتصال اليوم</option>
+                  <option value="followup_today">متابعة اليوم</option>
+                  <option value="contacted_awaiting">تم التواصل - بانتظار الرد</option>
+                  <option value="in_negotiation">مهتم - تفاوض وعرض سعر</option>
+                  <option value="future_opportunity">فرصة مستقبلية (&gt; 3 شهور)</option>
+                  <option value="not_interested">غير مهتم</option>
+                  <option value="won">تم التعاقد 🏆</option>
+                  <option value="lost">فرصة ضائعة</option>
+                  <option value="invalid_data">بيانات غير مكتملة</option>
+                  <option value="cold_low">أولوية منخفضة / بارد</option>
+                </select>
+
+                <select class="filter-select" id="filterPriority">
+                  <option value="">جميع درجات الأولوية</option>
+                  <option value="hot">ساخن (80 - 100) 🔥</option>
+                  <option value="warm">دافئ (60 - 79) ⚡</option>
+                  <option value="nurture">تغذية ومتابعة (35 - 59) ⏳</option>
+                  <option value="low">منخفض (0 - 34) ❄️</option>
+                </select>
+
+                <select class="filter-select" id="filterCampaign">
+                  <option value="">جميع الحملات الإعلانية</option>
+                </select>
+
+                <select class="filter-select" id="filterSortBy">
+                  <option value="score_desc">ترتيب: الأعلى نقاطاً (Scoring)</option>
+                  <option value="score_asc">ترتيب: الأقل نقاطاً</option>
+                  <option value="followup_urgency">ترتيب: الأكثر استحقاقاً للمتابعة</option>
+                  <option value="newest">ترتيب: الأحدث إضافة</option>
+                  <option value="oldest">ترتيب: الأقدم إضافة</option>
+                </select>
+              </div>
+
+              <div class="filter-group">
+                <button class="btn btn-outline btn-sm" id="btnExportExcel">
+                  <span>📊</span>
+                  <span>تصدير Excel</span>
+                </button>
+                <button class="btn btn-outline btn-sm" id="btnExportCSV">
+                  <span>📄</span>
+                  <span>تصدير CSV</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Bulk Selection Actions Bar -->
+            <div class="bulk-actions-bar" id="bulkActionsBar" style="display: none;">
+              <div style="font-weight: 700; color: #93c5fd; font-size: 0.88rem;">
+                تم تحديد <span id="selectedLeadsCount">0</span> عميل
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <select class="filter-select" id="bulkStatusSelect" style="background: var(--bg-card);">
+                  <option value="">تغيير الحالة إلى...</option>
+                  <option value="contact_today">اتصال اليوم</option>
+                  <option value="followup_today">متابعة اليوم</option>
+                  <option value="in_negotiation">تفاوض وعرض سعر</option>
+                  <option value="not_interested">غير مهتم</option>
+                  <option value="won">تم التعاقد 🏆</option>
+                </select>
+                <button class="btn btn-primary btn-sm" id="btnApplyBulkStatus">تطبيق الحالة</button>
+                <button class="btn btn-gold btn-sm" id="btnBulkSchedule">جدولة متابعة</button>
+                <button class="btn btn-danger btn-sm" id="btnBulkArchive">أرشفة المحدد</button>
+              </div>
+            </div>
+
+            <!-- Leads Table -->
+            <div class="data-table-responsive">
+              <table class="data-table" id="leadsTable">
+                <thead>
+                  <tr>
+                    <th style="width: 36px;"><input type="checkbox" id="selectAllCheckbox"></th>
+                    <th>العميل</th>
+                    <th>رقم الهاتف</th>
+                    <th>الباقة المطلوبة</th>
+                    <th>توقيت البدء</th>
+                    <th>النقاط</th>
+                    <th>الأولوية</th>
+                    <th>الحالة الحالية</th>
+                    <th>المتابعة القادمة</th>
+                    <th>التوصية الذكية</th>
+                    <th>الحملة الإعلانية</th>
+                    <th>إجراءات سريعة</th>
+                  </tr>
+                </thead>
+                <tbody id="leadsTableBody">
+                  <!-- Populated by JavaScript -->
+                </tbody>
+              </table>
+            </div>
+
+            <div style="padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 0.84rem;">
+              <div>عرض <span id="showingCount">0</span> عميل</div>
+              <div id="tableEmptyState" style="display: none; color: var(--text-dim);">لا توجد نتائج مطابقة لبحثك</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 3: TODAY'S FOLLOW-UP WORKSPACE (متابعات اليوم) -->
+        <section class="page-view" id="page-today-followups" style="display: none;">
+          <!-- Workspace Sub-tabs -->
+          <div class="workspace-tabs">
+            <button class="workspace-tab active" data-ws="today">
+              <span>📅</span>
+              <span>مكالمات ومتابعات اليوم</span>
+              <span class="nav-badge primary" id="wsCountToday">0</span>
+            </button>
+            <button class="workspace-tab" data-ws="overdue">
+              <span>⚠️</span>
+              <span>متابعات متأخرة</span>
+              <span class="nav-badge danger" id="wsCountOverdue">0</span>
+            </button>
+            <button class="workspace-tab" data-ws="untouched_hot">
+              <span>🔥</span>
+              <span>عملاء ساخنون لم يتم التواصل معهم</span>
+              <span class="nav-badge warning" id="wsCountHot">0</span>
+            </button>
+            <button class="workspace-tab" data-ws="awaiting">
+              <span>💬</span>
+              <span>عملاء مهتمون بانتظار الرد</span>
+              <span class="nav-badge primary" id="wsCountAwaiting">0</span>
+            </button>
+            <button class="workspace-tab" data-ws="upcoming">
+              <span>🗓️</span>
+              <span>متابعات قادمة (خلال 7 أيام)</span>
+              <span class="nav-badge" id="wsCountUpcoming">0</span>
+            </button>
+            <button class="workspace-tab" data-ws="review_archive">
+              <span>🔍</span>
+              <span>مراجعة قبل الإلغاء / تكرار عدم الرد</span>
+              <span class="nav-badge danger" id="wsCountReview">0</span>
+            </button>
+          </div>
+
+          <!-- Follow-up Cards Grid -->
+          <div class="followup-cards-grid" id="followupCardsGrid">
+            <!-- Cards rendered here dynamically -->
+          </div>
+        </section>
+
+        <!-- PAGE 4: HOT LEADS (العملاء الأكثر أولوية) -->
+        <section class="page-view" id="page-hot-leads" style="display: none;">
+          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: var(--radius-lg); padding: 18px 22px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <h3 style="color: #fbbf24; font-size: 1.1rem; font-weight: 800; margin-bottom: 4px;">قائمة العملاء الأكثر نية للشراء (Score 80–100)</h3>
+              <p style="color: #d1d5db; font-size: 0.86rem;">هؤلاء العملاء أبدوا نية شراء واضحة، واختاروا باقات المقر السنوي أو قاعات الاجتماعات ولديهم توقيت بدء فوري. اتصل بهم الآن!</p>
+            </div>
+            <button class="btn btn-gold" id="btnFocusCallHot">بدء دورة الاتصال بالعملاء الساخنين</button>
+          </div>
+          <div id="hotLeadsContainer" class="followup-cards-grid"></div>
+        </section>
+
+        <!-- PAGE 5: FUTURE OPPORTUNITIES (فرص مستقبلية > 3 شهور) -->
+        <section class="page-view" id="page-future-opps" style="display: none;">
+          <div style="background: rgba(6, 182, 212, 0.1); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: var(--radius-lg); padding: 18px 22px; margin-bottom: 20px;">
+            <h3 style="color: #38bdf8; font-size: 1.1rem; font-weight: 800; margin-bottom: 4px;">الفرص طويلة المدى (البدء بعد 3 شهور)</h3>
+            <p style="color: #d1d5db; font-size: 0.86rem;">عملاء جادون ولكن إجراءاتهم أو ميزانياتهم محددة للربع القادم. لا تضغط عليهم بالاتصال المباشر؛ النظام يجدول لهم رسائل تذكير دورية.</p>
+          </div>
+          <div id="futureOppsContainer" class="followup-cards-grid"></div>
+        </section>
+
+        <!-- PAGE 6: PIPELINE KANBAN (مراحل البيع) -->
+        <section class="page-view" id="page-pipeline" style="display: none;">
+          <div class="kanban-board" id="kanbanBoard">
+            <!-- Rendered by JavaScript -->
+          </div>
+        </section>
+
+        <!-- PAGE 7: CAMPAIGN REPORTS (تحليل الحملات) -->
+        <section class="page-view" id="page-campaigns" style="display: none;">
+          <div class="card-table-wrapper" style="margin-bottom: 24px;">
+            <div class="table-toolbar">
+              <h3 style="font-size: 1.05rem; font-weight: 800; color: #ffffff;">تحليل أداء الحملات الإعلانية ومعدل جودة العملاء</h3>
+            </div>
+            <div class="data-table-responsive">
+              <table class="data-table" id="campaignsReportTable">
+                <thead>
+                  <tr>
+                    <th>اسم الحملة الإعلانية</th>
+                    <th>المنصة</th>
+                    <th>إجمالي العملاء</th>
+                    <th>عملاء ساخنون (Hot)</th>
+                    <th>صفقات رابحة (Won)</th>
+                    <th>معدل التحويل (CR%)</th>
+                    <th>مؤشر كفاءة وجودة الحملة</th>
+                  </tr>
+                </thead>
+                <tbody id="campaignsReportTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 8: IMPORT CENTER (استيراد Excel و CSV) -->
+        <section class="page-view" id="page-import-center" style="display: none;">
+          <!-- Import Steps Indicator -->
+          <div class="import-steps">
+            <div class="import-step-item active" id="step1Indicator">
+              <span class="step-num">1</span>
+              <span>اختيار الملف أو لصق البيانات</span>
+            </div>
+            <div class="import-step-item" id="step2Indicator">
+              <span class="step-num">2</span>
+              <span>مطابقة الأعمدة والذكاء الاصطناعي</span>
+            </div>
+            <div class="import-step-item" id="step3Indicator">
+              <span class="step-num">3</span>
+              <span>المعاينة والتحقق من التكرار والحفظ</span>
+            </div>
+          </div>
+
+          <!-- Step 1: Upload / Drag-drop / Paste -->
+          <div id="importStep1">
+            <div class="import-box" id="dropZone">
+              <div class="import-box-icon">📁</div>
+              <h3 style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin-bottom: 8px;">اسحب وأفلت ملف Excel أو CSV هنا</h3>
+              <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 18px;">يدعم صيغ .xlsx و .xls و .csv بأحجام مفتوحة وبترميز UTF-8 العربي الكامل</p>
+              <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" style="display: none;">
+              <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                  <span>📂</span>
+                  <span>تصفح واختيار ملف من جهازك</span>
+                </button>
+                <button class="btn btn-outline" id="btnOpenPasteModal">
+                  <span>📋</span>
+                  <span>لصق جدول إكسيل مباشرة (Ctrl+V)</span>
+                </button>
+                <button class="btn btn-gold" id="btnDownloadTemplate">
+                  <span>📥</span>
+                  <span>تحميل نموذج إكسيل تجريبي للشركة</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Import History -->
+            <div class="card-table-wrapper" style="margin-top: 24px;">
+              <div class="table-toolbar">
+                <h3 style="font-size: 1rem; font-weight: 800; color: #ffffff;">سجل عمليات الاستيراد السابقة (Import Audit Log)</h3>
+              </div>
+              <div class="data-table-responsive">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>اسم الملف</th>
+                      <th>تاريخ الاستيراد</th>
+                      <th>إجمالي الصفوف</th>
+                      <th>عملاء جدد</th>
+                      <th>عملاء تم تحديثهم</th>
+                      <th>تنبيهات التدقيق</th>
+                    </tr>
+                  </thead>
+                  <tbody id="importHistoryTableBody">
+                    <tr><td colspan="7" style="text-align: center; color: var(--text-dim);">لا توجد عمليات استيراد سابقة</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Column Mapping Step -->
+          <div id="importStep2" style="display: none;">
+            <div class="card-table-wrapper" style="margin-bottom: 20px;">
+              <div class="table-toolbar">
+                <div>
+                  <h3 style="font-size: 1.1rem; font-weight: 800; color: #ffffff;">مطابقة أعمدة الملف مع حقول نظام Smart Address Egypt</h3>
+                  <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">تعرف النظام تلقائياً على الأعمدة. يمكنك تعديل أي حقل يدوي قبل بدء المعاينة.</p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-outline btn-sm" id="btnBackToStep1">إلغاء والعودة</button>
+                  <button class="btn btn-primary btn-sm" id="btnProceedToStep3">المتابعة للمعاينة ➔</button>
+                </div>
+              </div>
+              <div class="data-table-responsive">
+                <table class="data-table" id="mappingTable">
+                  <thead>
+                    <tr>
+                      <th>عنوان العمود في الملف</th>
+                      <th>عينة من أول صف بالملف</th>
+                      <th>الحقل المطابق في الـ CRM</th>
+                      <th>الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody id="mappingTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: Preview, Duplicate Check & Commit -->
+          <div id="importStep3" style="display: none;">
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px;">
+              <div class="kpi-card">
+                <span class="kpi-label">إجمالي السجلات بالملف</span>
+                <span class="kpi-value" id="previewTotalRows">0</span>
+              </div>
+              <div class="kpi-card" style="border-top: 3px solid var(--emerald);">
+                <span class="kpi-label">عملاء جدد بالكامل</span>
+                <span class="kpi-value" style="color: var(--emerald);" id="previewNewRows">0</span>
+              </div>
+              <div class="kpi-card" style="border-top: 3px solid var(--gold);">
+                <span class="kpi-label">عملاء مكررون بالهاتف/البريد</span>
+                <span class="kpi-value" style="color: var(--gold);" id="previewDupRows">0</span>
+              </div>
+              <div class="kpi-card" style="border-top: 3px solid var(--rose);">
+                <span class="kpi-label">تنبيهات تدقيق (بيانات ناقصة)</span>
+                <span class="kpi-value" style="color: var(--rose);" id="previewFlaggedRows">0</span>
+              </div>
+            </div>
+
+            <div class="card-table-wrapper" style="margin-bottom: 20px;">
+              <div class="table-toolbar">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                  <span style="font-weight: 700; color: #ffffff;">استراتيجية التعامل مع السجلات المكررة:</span>
+                  <select class="filter-select" id="dupStrategySelect">
+                    <option value="update">تحديث السجل الحالي مع الحفاظ على الملاحظات وسجل التواصل</option>
+                    <option value="skip">تخطي السجلات المكررة وعدم استيرادها</option>
+                  </select>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-outline btn-sm" id="btnBackToStep2">تعديل المطابقة</button>
+                  <button class="btn btn-success" id="btnCommitImport">تأكيد الاستيراد وحفظ البيانات في النظام 🚀</button>
+                </div>
+              </div>
+              <div class="data-table-responsive">
+                <table class="data-table" id="previewTable">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>اسم العميل</th>
+                      <th>الهاتف الأصلي</th>
+                      <th>الهاتف بعد التنسيق القياسي</th>
+                      <th>الباقة المطلوبة</th>
+                      <th>توقيت البدء</th>
+                      <th>التقييم المقترح</th>
+                      <th>فحص التكرار</th>
+                      <th>تنبيهات</th>
+                    </tr>
+                  </thead>
+                  <tbody id="previewTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 9: ARCHIVE (الأرشيف) -->
+        <section class="page-view" id="page-archive" style="display: none;">
+          <div class="card-table-wrapper">
+            <div class="table-toolbar">
+              <h3 style="font-size: 1.05rem; font-weight: 800; color: #ffffff;">العملاء المؤرشفون والمستبعدون نهائياً</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted);">لا يتم حذف أي عميل نهائياً تلقائياً، يمكنك استعادة أي عميل للمتابعة في أي وقت.</p>
+            </div>
+            <div class="data-table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>اسم العميل</th>
+                    <th>الهاتف</th>
+                    <th>الباقة</th>
+                    <th>سبب الاستبعاد / الأرشفة</th>
+                    <th>آخر تقييم</th>
+                    <th>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody id="archiveTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE 10: SETTINGS (الإعدادات) -->
+        <section class="page-view" id="page-settings" style="display: none;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <!-- Scoring Engine Weights -->
+            <div class="card-table-wrapper" style="padding: 22px;">
+              <h3 style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-bottom: 6px;">محرك تقييم العملاء (Scoring Rules Engine)</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 18px;">تحديد الأوزان النسبية لحساب مؤشر الشراء (0 - 100):</p>
+
+              <div class="form-group">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>وزن توقيت البدء (Intent Timeline)</span>
+                  <span id="weightTimelineVal" style="color: var(--primary); font-weight: 800;">30%</span>
+                </label>
+                <input type="range" class="form-range" id="weightTimeline" min="5" max="50" value="30" style="width: 100%;">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>وزن قيمة الباقة المطلوبة (Package Value)</span>
+                  <span id="weightPackageVal" style="color: var(--primary); font-weight: 800;">20%</span>
+                </label>
+                <input type="range" class="form-range" id="weightPackage" min="5" max="40" value="20" style="width: 100%;">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>وزن تصنيف الجودة الأولي بالإعلان (Lead Quality)</span>
+                  <span id="weightQualityVal" style="color: var(--primary); font-weight: 800;">20%</span>
+                </label>
+                <input type="range" class="form-range" id="weightQuality" min="5" max="40" value="20" style="width: 100%;">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>وزن اكتمال بيانات الاتصال (Phone & Email)</span>
+                  <span id="weightContactVal" style="color: var(--primary); font-weight: 800;">15%</span>
+                </label>
+                <input type="range" class="form-range" id="weightContact" min="5" max="30" value="15" style="width: 100%;">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" style="display: flex; justify-content: space-between;">
+                  <span>وزن ملاحظات وتفاعل العميل الإيجابي (Feedback)</span>
+                  <span id="weightFeedbackVal" style="color: var(--primary); font-weight: 800;">15%</span>
+                </label>
+                <input type="range" class="form-range" id="weightFeedback" min="5" max="30" value="15" style="width: 100%;">
+              </div>
+
+              <div style="margin-top: 18px; display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="chkRecalcLeads">
+                <label for="chkRecalcLeads" style="font-size: 0.84rem; font-weight: 600;">إعادة حساب درجات جميع العملاء الحاليين تلقائياً بالأوزان الجديدة</label>
+              </div>
+
+              <button class="btn btn-primary" id="btnSaveScoringSettings" style="margin-top: 18px; width: 100%;">حفظ إعدادات التقييم</button>
+            </div>
+
+            <!-- Follow-up & CRM Rules -->
+            <div class="card-table-wrapper" style="padding: 22px;">
+              <h3 style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-bottom: 6px;">قواعد المتابعة وتجميد العملاء غير المتجاوبين</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 18px;">معايير تجميد المتابعة وتفادي إهدار وقت فريق المبيعات:</p>
+
+              <div class="form-group">
+                <label class="form-label">الحد الأقصى لمحاولات الاتصال دون رد قبل التجميد</label>
+                <input type="number" class="form-input" id="settingMaxAttempts" value="4" min="2" max="10">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">حد نقاط العميل الساخن (Hot Lead Threshold)</label>
+                <input type="number" class="form-input" id="settingThreshHot" value="80" min="60" max="95">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">حد نقاط العميل الدافئ (Warm Lead Threshold)</label>
+                <input type="number" class="form-input" id="settingThreshWarm" value="60" min="40" max="79">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">الربط مع السحابة أو Supabase (اختياري)</label>
+                <input type="text" class="form-input" id="settingSupabaseUrl" placeholder="https://your-project.supabase.co" style="margin-bottom: 6px;">
+                <input type="password" class="form-input" id="settingSupabaseKey" placeholder="Supabase Anon Key">
+              </div>
+
+              <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-outline" id="btnExportFullBackup" style="flex: 1;">تصدير نسخة احتياطية (JSON)</button>
+                <button class="btn btn-gold" id="btnSeedSampleLeads" style="flex: 1;">استعادة بيانات تجريبية</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- LEAD DETAILS SLIDE-OVER DRAWER -->
+  <div class="modal-overlay" id="drawerOverlay"></div>
+  <aside class="drawer-container" id="leadDrawer">
+    <div class="drawer-header">
+      <div>
+        <h3 id="drawerLeadName" style="font-size: 1.15rem; font-weight: 800; color: #ffffff;">اسم العميل</h3>
+        <p id="drawerLeadPhone" style="font-size: 0.82rem; color: var(--text-muted);">الهاتف</p>
+      </div>
+      <button class="btn btn-outline btn-icon" id="btnCloseDrawer">✕</button>
+    </div>
+
+    <div class="drawer-tabs">
+      <div class="drawer-tab active" data-dtab="overview">نظرة عامة والتقييم</div>
+      <div class="drawer-tab" data-dtab="whatsapp">رسالة واتساب المقترحة</div>
+      <div class="drawer-tab" data-dtab="activities">سجل المكالمات</div>
+      <div class="drawer-tab" data-dtab="source">البيانات الأصلية للإعلان</div>
+    </div>
+
+    <div class="drawer-content">
+      <!-- Drawer Tab 1: Overview & AI Recommendation -->
+      <div class="dtab-content active" id="dtab-overview">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="font-weight: 800; color: #ffffff;">تقييم العميل ومستوى الجدية:</span>
+            <span id="drawerScoreBadge" class="score-pill score-high">90</span>
+          </div>
+          <p id="drawerExplanation" style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;"></p>
+        </div>
+
+        <div style="background: rgba(37, 99, 235, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px;">
+          <div class="advice-label" style="color: #60a5fa; margin-bottom: 6px;">💡 التوصية العملية لفريق المبيعات:</div>
+          <p id="drawerActionAdvice" style="font-size: 0.88rem; font-weight: 700; color: #ffffff; line-height: 1.5;"></p>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;" id="drawerTimingAdvice"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">حالة العميل بالـ CRM:</label>
+          <select class="form-select" id="drawerStatusSelect">
+            <option value="contact_today">اتصال اليوم</option>
+            <option value="followup_today">متابعة اليوم</option>
+            <option value="contacted_awaiting">تم التواصل - بانتظار الرد</option>
+            <option value="in_negotiation">مهتم - تفاوض وعرض سعر</option>
+            <option value="future_opportunity">فرصة مستقبلية (&gt; 3 شهور)</option>
+            <option value="won">تم التعاقد 🏆</option>
+            <option value="not_interested">غير مهتم</option>
+            <option value="lost">فرصة ضائعة</option>
+            <option value="invalid_data">بيانات غير مكتملة</option>
+            <option value="cold_low">أولوية منخفضة / بارد</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">تاريخ ووقت المتابعة القادمة:</label>
+          <input type="datetime-local" class="form-input" id="drawerNextFollowupInput">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ملاحظات مسؤول المبيعات (Sales Notes):</label>
+          <textarea class="form-textarea" id="drawerSalesNotes" rows="3" placeholder="أضف ملاحظات المكالمة، اعتراضات العميل، أو تفاصيل العرض..."></textarea>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 14px;">
+          <button class="btn btn-primary" id="btnSaveDrawerLead" style="flex: 1;">حفظ التعديلات</button>
+          <button class="btn btn-outline" id="btnArchiveLead">أرشفة العميل</button>
+        </div>
+      </div>
+
+      <!-- Drawer Tab 2: WhatsApp Generator -->
+      <div class="dtab-content" id="dtab-whatsapp" style="display: none;">
+        <div style="background: rgba(18, 140, 126, 0.1); border: 1px solid rgba(37, 211, 102, 0.3); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px;">
+          <div style="font-weight: 800; color: #25d366; font-size: 0.92rem; margin-bottom: 4px;">💬 مسودة واتساب مقترحة باللهجة المصرية التجارية:</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">مجهزة ومخصصة للباقة وتوقيت البدء المذكور في استمارة العميل</p>
+        </div>
+
+        <div class="form-group">
+          <textarea class="form-textarea" id="drawerWaDraftText" rows="6"></textarea>
+        </div>
+
+        <button class="btn btn-success" id="btnLaunchWhatsApp" style="width: 100%;">
+          <span>💬</span>
+          <span>فتح محادثة واتساب بالرسالة المجهزة</span>
+        </button>
+      </div>
+
+      <!-- Drawer Tab 3: Activities & Call Logging -->
+      <div class="dtab-content" id="dtab-activities" style="display: none;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px;">
+          <h4 style="font-size: 0.9rem; font-weight: 800; color: #ffffff; margin-bottom: 10px;">تسجيل محاولة اتصال جديدة:</h4>
+          
+          <div class="form-group">
+            <label class="form-label">قناة التواصل:</label>
+            <select class="form-select" id="logActivityType">
+              <option value="call">مكالمة هاتفية 📞</option>
+              <option value="whatsapp">محادثة واتساب 💬</option>
+              <option value="meeting">معاينة مقر / اجتماع 🏢</option>
+              <option value="email">بريد إلكتروني ✉️</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">نتيجة التواصل (Outcome):</label>
+            <select class="form-select" id="logActivityOutcome">
+              <option value="interested">مهتم وطلب تفاصيل الباقة وعرض السعر</option>
+              <option value="no_answer">لم يرد على الاتصال (No Answer)</option>
+              <option value="call_later">طلب الاتصال في وقت لاحق</option>
+              <option value="meeting_scheduled">تم حجز موعد لمعاينة المقر</option>
+              <option value="not_interested">غير مهتم صراحة</option>
+              <option value="invalid_number">الرقم مغلق أو غير صحيح</option>
+              <option value="won">تم التعاقد وسداد الباقة 🏆</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">تفاصيل المحادثة:</label>
+            <textarea class="form-textarea" id="logActivityNotes" rows="2" placeholder="ماذا دار في المكالمة؟"></textarea>
+          </div>
+
+          <button class="btn btn-primary btn-sm" id="btnSubmitLogActivity" style="width: 100%;">تسجيل النتيجة في السجل</button>
+        </div>
+
+        <div style="font-weight: 800; color: #ffffff; font-size: 0.9rem; margin-bottom: 8px;">سجل التفاعلات السابقة:</div>
+        <div id="drawerActivitiesList" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+
+      <!-- Drawer Tab 4: Raw Source Audit Data -->
+      <div class="dtab-content" id="dtab-source" style="display: none;">
+        <div style="background: rgba(11, 17, 32, 0.7); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px;">
+          <div style="font-weight: 800; color: var(--gold); margin-bottom: 10px; font-size: 0.88rem;">بيانات الاستيراد الأصلية من الإكسيل (للتدقيق والرجوع):</div>
+          <div id="drawerSourceDataList" style="display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem;"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- QUICK CALL LOG MODAL -->
+  <div class="modal-overlay" id="quickCallModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 id="modalCallLeadName" style="font-size: 1.05rem; font-weight: 800; color: #ffffff;">تسجيل نتيجة الاتصال</h3>
+        <button class="btn btn-outline btn-icon" id="btnCloseCallModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">نتيجة المكالمة:</label>
+          <select class="form-select" id="quickCallOutcome">
+            <option value="no_answer">لم يرد على الاتصال (No Answer)</option>
+            <option value="interested">مهتم وطلب إرسال العرض</option>
+            <option value="call_later">طلب الاتصال في وقت لاحق</option>
+            <option value="meeting_scheduled">تم تحديد موعد لمعاينة قاعة الاجتماعات أو المقر</option>
+            <option value="not_interested">غير مهتم / رفض الخدمة</option>
+            <option value="invalid_number">الرقم مغلق أو خاطئ</option>
+            <option value="won">تم إتمام التعاقد 🏆</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ملاحظات سريعة:</label>
+          <textarea class="form-textarea" id="quickCallNotes" rows="2" placeholder="ملاحظات المكالمة..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">تاريخ المتابعة القادمة:</label>
+          <input type="datetime-local" class="form-input" id="quickCallNextDate">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="btnCancelCallModal">إلغاء</button>
+        <button class="btn btn-primary" id="btnSaveQuickCall">حفظ النتيجة وتحديث الـ CRM</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASTE EXCEL TABLE MODAL -->
+  <div class="modal-overlay" id="pasteTableModal">
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: #ffffff;">لصق جدول إكسيل مباشرة (Paste from Excel)</h3>
+        <button class="btn btn-outline btn-icon" id="btnClosePasteModal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 10px;">حدد الخلايا والصفوف في ملف الإكسيل، اضغط Ctrl+C، ثم الصق هنا مباشرة:</p>
+        <textarea class="form-textarea" id="pasteDataTextarea" rows="10" placeholder="الصق محتوى الجدول هنا..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="btnCancelPasteModal">إلغاء</button>
+        <button class="btn btn-primary" id="btnProcessPastedData">معالجة الجدول ومطابقة الأعمدة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
