@@ -1,0 +1,88 @@
+/* ==============================================================================
+   Smart Address Egypt CRM - Responsive Optimizations
+   ============================================================================== */
+
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+  .page-content {
+    padding: 18px 20px 30px;
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0px;
+  }
+
+  .sidebar {
+    transform: translateX(100%);
+    width: 270px;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.8);
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .main-wrapper {
+    margin-right: 0;
+  }
+
+  .top-navbar {
+    padding: 0 16px;
+  }
+
+  .mobile-menu-btn {
+    display: flex !important;
+  }
+
+  .quick-search-box {
+    width: 180px;
+  }
+
+  .lead-drawer {
+    width: 100vw;
+  }
+
+  .action-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .followup-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mobile-menu-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  padding: 8px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.mobile-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 95;
+}
+
+.mobile-overlay.active {
+  display: block;
+}
